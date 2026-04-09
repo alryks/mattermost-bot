@@ -1,3 +1,4 @@
+import json
 import logging
 
 from mmpy_bot import Message, Plugin, listen_to, listen_webhook, WebHookEvent, ActionEvent
@@ -24,6 +25,51 @@ class BasePlugin(Plugin):
             channel_id=channel_id,
             message="Bot has started.",
         )
+
+    def _open_example_dialog(self, event: ActionEvent) -> None:
+        state = json.dumps(
+            {
+                "channel_id": event.channel_id,
+                "user_id": event.user_id,
+            }
+        )
+        dialog = {
+            "trigger_id": event.trigger_id,
+            "url": f"{self.app_settings.webhook_public_url}:{self.app_settings.webhook_public_port}/"
+            "hooks/dialog-submit",
+            "dialog": {
+                "callback_id": "example-dialog",
+                "title": "Example Dialog",
+                "submit_label": "Create post",
+                "state": state,
+                "elements": [
+                    {
+                        "display_name": "Title",
+                        "name": "title",
+                        "type": "text",
+                        "placeholder": "Weekly sync",
+                    },
+                    {
+                        "display_name": "Summary",
+                        "name": "summary",
+                        "type": "textarea",
+                        "placeholder": "What should be posted?",
+                    },
+                    {
+                        "display_name": "Priority",
+                        "name": "priority",
+                        "type": "select",
+                        "default": "medium",
+                        "options": [
+                            {"text": "Low", "value": "low"},
+                            {"text": "Medium", "value": "medium"},
+                            {"text": "High", "value": "high"},
+                        ],
+                    },
+                ],
+            },
+        }
+        self.driver.client.post("/api/v4/actions/dialogs/open", options=dialog)
 
     @listen_to("^ping$", needs_mention=True)
     async def ping(self, message: Message) -> None:
@@ -79,3 +125,47 @@ class BasePlugin(Plugin):
                 ]
             },
         )
+
+    @listen_to("^!dialog$", direct_only=False)
+    async def dialog_example(self, message: Message) -> None:
+        self.driver.reply_to(
+            message,
+            "Open the example dialog and submit it to create a post with the entered data.",
+            props={
+                "attachments": [
+                    {
+                        "text": "Example interactive dialog",
+                        "actions": [
+                            {
+                                "id": "openExampleDialog",
+                                "name": "Open dialog",
+                                "integration": {
+                                    "url": f"{self.app_settings.webhook_public_url}:{self.app_settings.webhook_public_port}/"
+                                    "hooks/dialog-open",
+                                },
+                            }
+                        ],
+                    }
+                ]
+            },
+        )
+
+    @listen_webhook("dialog-open")
+    async def open_dialog_webhook(self, event: ActionEvent) -> None:
+        self._open_example_dialog(event)
+        self.driver.respond_to_web(event, {})
+
+    @listen_webhook("dialog-submit")
+    async def submit_dialog_webhook(self, event: ActionEvent) -> None:
+        submission = event.body.get("submission", {})
+        state = json.loads(event.body.get("state") or "{}")
+        channel_id = state.get("channel_id") or event.channel_id
+
+        lines = [
+            "New dialog submission:",
+            f"- Title: {submission.get('title', '').strip() or '(empty)'}",
+            f"- Summary: {submission.get('summary', '').strip() or '(empty)'}",
+            f"- Priority: {submission.get('priority', '').strip() or '(empty)'}",
+        ]
+        self.driver.create_post(channel_id=channel_id, message="\n".join(lines))
+        self.driver.respond_to_web(event, {})
