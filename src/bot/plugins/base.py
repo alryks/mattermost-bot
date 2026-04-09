@@ -36,6 +36,7 @@ class BasePlugin(Plugin):
     @listen_webhook("ping")
     @listen_webhook("pong")
     async def action_listener(self, event: WebHookEvent):
+        logger.info(str(event.body))
         self.driver.create_post(
             event.body["channel_id"], f"Webhook {event.webhook_id} triggered!"
         )
