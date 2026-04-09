@@ -1,6 +1,6 @@
 import logging
 
-from mmpy_bot import Message, Plugin, listen_to
+from mmpy_bot import Message, Plugin, listen_to, listen_webhook, WebHookEvent, ActionEvent
 
 from bot.config import Settings
 
@@ -32,3 +32,50 @@ class BasePlugin(Plugin):
     @listen_to("^echo\\s+(.+)$", needs_mention=True)
     async def echo(self, message: Message, text: str) -> None:
         self.driver.reply_to(message, text)
+
+    @listen_webhook("ping")
+    @listen_webhook("pong")
+    async def action_listener(self, event: WebHookEvent):
+        self.driver.create_post(
+            event.body["channel_id"], f"Webhook {event.webhook_id} triggered!"
+        )
+
+    @listen_to("!button", direct_only=False)
+    async def webhook_button(self, message: Message):
+        """Creates a button that will trigger a webhook depending on the choice."""
+        self.driver.reply_to(
+            message,
+            "",
+            props={
+                "attachments": [
+                    {
+                        "pretext": None,
+                        "text": "Take your pick..",
+                        "actions": [
+                            {
+                                "id": "sendPing",
+                                "name": "Ping",
+                                "integration": {
+                                    "url": f"{self.app_settings.webhook_public_url}:{self.app_settings.webhook_public_port}/"
+                                    "hooks/ping",
+                                    "context": {
+                                        "text": "The ping webhook works! :tada:",
+                                    },
+                                },
+                            },
+                            {
+                                "id": "sendPong",
+                                "name": "Pong",
+                                "integration": {
+                                    "url": f"{self.app_settings.webhook_public_url}:{self.app_settings.webhook_public_port}/"
+                                    "hooks/pong",
+                                    "context": {
+                                        "text": "The pong webhook works! :tada:",
+                                    },
+                                },
+                            },
+                        ],
+                    }
+                ]
+            },
+        )

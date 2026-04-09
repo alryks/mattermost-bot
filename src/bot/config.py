@@ -10,6 +10,15 @@ class Settings(BaseSettings):
     
     log_level: str = Field(default="INFO", alias="APP_LOG_LEVEL")
 
+    webhook_public_url: str = Field(
+        default="http://127.0.0.1",
+        alias="WEBHOOK_PUBLIC_URL",
+    )
+    webhook_public_port: int = Field(
+        default=8579,
+        alias="WEBHOOK_PUBLIC_PORT",
+    )
+
 
 def get_settings() -> Settings:
     return Settings()

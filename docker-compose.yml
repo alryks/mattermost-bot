@@ -5,4 +5,6 @@ services:
       dockerfile: ./src/bot/Dockerfile
     env_file:
       - .env
+    ports:
+      - "${WEBHOOK_PUBLIC_PORT}:${WEBHOOK_HOST_PORT}"
     restart: unless-stopped
